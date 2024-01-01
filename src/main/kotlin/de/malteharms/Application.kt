@@ -1,6 +1,7 @@
 package de.malteharms
 
 import de.malteharms.plugins.*
+import de.malteharms.states.CostsWrapper
 import io.ktor.server.application.*
 
 fun main(args: Array<String>) {
@@ -8,8 +9,10 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module() {
+    val costState = CostsWrapper()
+
     configureSerialization()
     configureSockets()
     configureMonitoring()
-    configureRouting()
+    configureRouting(costState)
 }
