@@ -14,7 +14,7 @@ val mainModule = module {
             .getDatabase("app_db")
     }
 
-    single< CostDataSource> {
+    single<CostDataSource> {
         CostDataSourceImpl(get())
     }
 
