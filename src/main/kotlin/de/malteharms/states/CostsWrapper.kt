@@ -1,7 +1,7 @@
 package de.malteharms.states
 
-import de.malteharms.models.CostEntry
-import de.malteharms.models.CostState
+import de.malteharms.data.models.CostItem
+import de.malteharms.data.models.CostState
 import io.ktor.websocket.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 class CostsWrapper {
@@ -62,7 +61,7 @@ class CostsWrapper {
         }
     }
 
-    fun addItem(item: CostEntry) {
+    fun addItem(item: CostItem) {
         state.update {
             it.copy(
                 items = it.items + item

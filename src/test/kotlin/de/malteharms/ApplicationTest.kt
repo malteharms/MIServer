@@ -1,6 +1,7 @@
 package de.malteharms
 
 import de.malteharms.plugins.*
+import de.malteharms.states.CostsWrapper
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -11,7 +12,8 @@ class ApplicationTest {
     @Test
     fun testRoot() = testApplication {
         application {
-            configureRouting()
+            val costState = CostsWrapper()
+            configureRouting(costState)
         }
         client.get("/").apply {
             assertEquals(HttpStatusCode.OK, status)
