@@ -8,15 +8,18 @@ import org.litote.kmongo.gte
 import org.litote.kmongo.lt
 
 class CostDataSourceImpl(
-    private val db: CoroutineDatabase
+    db: CoroutineDatabase
 ): CostDataSource {
 
     private val items = db.getCollection<CostItem>()
 
     override suspend fun getAllItems(): List<CostItem> {
-        return items.find()
+        val list: List<CostItem> = items.find()
             .descendingSort(CostItem::timestamp)
             .toList()
+
+        println(list)
+        return list
     }
 
     override suspend fun getGroupItems(groupId: String): List<CostItem> {

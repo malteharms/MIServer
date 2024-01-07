@@ -1,6 +1,8 @@
 package de.malteharms.routes
 
 import de.malteharms.data.models.CostItem
+import de.malteharms.data.models.IncomingMessage
+import de.malteharms.data.models.MessageData
 import de.malteharms.sessions.AppSession
 import de.malteharms.sessions.MemberAlreadyExistsException
 import de.malteharms.sessions.SessionController
@@ -13,6 +15,7 @@ import io.ktor.server.websocket.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.channels.consumeEach
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 fun Route.appSocket(sessionController: SessionController) {
     webSocket("/app") {
@@ -24,17 +27,18 @@ fun Route.appSocket(sessionController: SessionController) {
 
         try {
             sessionController.onJoin(
-                username = session.username,
                 sessionId = session.sessionId,
                 socket = this
             )
 
             incoming.consumeEach { frame ->
                 if(frame is Frame.Text) {
-                    sessionController.sendItem(
-                        item = Json.decodeFromString(frame.readText())
-
-                    )
+                    try {
+                        val jsonRequest: JsonObject = Json.decodeFromString(frame.readText())
+                        sessionController.handleRequest(jsonRequest)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                 }
             }
 
@@ -43,16 +47,18 @@ fun Route.appSocket(sessionController: SessionController) {
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
-            sessionController.tryDisconnect(session.username)
+            sessionController.tryDisconnect(session.sessionId)
         }
     }
+
+
 }
 
 fun Route.getAllItems(sessionController: SessionController) {
     get("/costItems") {
         call.respond(
             HttpStatusCode.OK,
-            sessionController.getAllItems()
+            sessionController.costsBroadcastAllItems()
         )
     }
 }

@@ -12,8 +12,7 @@ fun Application.configureSecurity() {
 
     intercept(Plugins) {
         if(call.sessions.get<AppSession>() == null) {
-            val username = call.parameters["username"] ?: "Guest"
-            call.sessions.set(AppSession(username, generateSessionId()))
+            call.sessions.set(AppSession(generateSessionId()))
         }
     }
 }
