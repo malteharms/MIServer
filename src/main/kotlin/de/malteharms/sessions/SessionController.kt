@@ -5,9 +5,7 @@ import de.malteharms.data.models.*
 import io.ktor.http.*
 import io.ktor.websocket.*
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.*
 import org.litote.kmongo.json
 import java.util.concurrent.ConcurrentHashMap
 
@@ -33,35 +31,46 @@ class SessionController(
     }
 
     suspend fun handleRequest(message: JsonObject) {
-        val data = message["data"]
-        var messageType: IncomingMessageType = IncomingMessageType.COST_ADD_ITEM
-        try {
-            val tmpType = message["type"]
-            val strType = tmpType.toString()
-            messageType = IncomingMessageType.valueOf(strType)
+        /*
+            An incoming message has the following definition on client side:
+
+                data class *OutgoingMessage(
+                    val type: MessageType,
+                    val data: Any
+                )
+
+            Because we cannot access the class name and therefor don't know how data is looking like,
+            we have to analyse the json representation of MessageType, to then parse the data object
+            into our needed object type.
+         */
+
+        if(message["data"] == null) { return }
+        val data: JsonElement = message["data"]!!
+
+        val messageType: MessageType =  try {
+            MessageType.valueOf(message["type"].toString().trim('\"'))
         } catch (e: IllegalArgumentException) {
-            IncomingMessageType.ERROR
+            MessageType.ERROR
         }
 
         when (messageType) {
-            IncomingMessageType.REGISTER -> {
+            MessageType.REGISTER -> {
 
             }
-            IncomingMessageType.LOGIN -> {
+            MessageType.LOGIN -> {
 
             }
-            IncomingMessageType.COST_GET_ITEMS -> {
+            MessageType.COST_GET_ITEMS -> {
                 // TODO: extract session_id to just send the update to that user
                 costsBroadcastAllItems()
             }
-            IncomingMessageType.COST_ADD_ITEM -> {
-                // TODO: check if data is not null
-                val decodedData: CostItem = Json.decodeFromJsonElement(data!!)
+            MessageType.COST_ADD_ITEM -> {
+                val decodedData: CostItem = Json.decodeFromJsonElement(data)
                 costsAddNewItem(decodedData)
                 costsBroadcastAllItems()
             }
 
-            IncomingMessageType.ERROR -> {
+            MessageType.ERROR -> {
                 // TODO
             }
         }
