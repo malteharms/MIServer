@@ -1,16 +1,15 @@
 package de.malteharms.sessions
 
-import de.malteharms.data.CostDataSource
+import de.malteharms.data.DataSource
 import de.malteharms.data.models.*
-import io.ktor.http.*
 import io.ktor.websocket.*
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import org.litote.kmongo.json
 import java.util.concurrent.ConcurrentHashMap
 
 class SessionController(
-    private val costDataSource: CostDataSource
+    private val db: DataSource
 ) {
     private val members = ConcurrentHashMap<String, Member>()
 
@@ -30,7 +29,10 @@ class SessionController(
         )
     }
 
-    suspend fun handleRequest(message: JsonObject) {
+    suspend fun handleRequest(
+        message: JsonObject,
+        sessionId: String
+    ) {
         /*
             An incoming message has the following definition on client side:
 
@@ -54,45 +56,95 @@ class SessionController(
         }
 
         when (messageType) {
-            MessageType.REGISTER -> {
+            MessageType.REGISTER -> {           // Incoming data is from type Registration
+                try {
+                    val decodedData: Registration =             // decode to CostItem data class
+                        Json.decodeFromJsonElement(data)
 
+                    if (!db.addAccount(username = decodedData.username, password = decodedData.passwordHash)) {
+                        // TODO: Improve the error handling
+                        return
+                    }
+
+                } catch (e: SerializationException) {
+                    println("Could not decode from Json because 'data' is not a json string")
+                } catch (e: IllegalArgumentException) {
+                    println("Could not decode from Json because 'data' is not a representation of CostItem")
+                }
             }
+
             MessageType.LOGIN -> {
+                try {
+                    val decodedData: Login =             // decode to CostItem data class
+                        Json.decodeFromJsonElement(data)
 
+                    if (!db.confirmCredentials(uuid = decodedData.uuid, password = decodedData.passwordHash)) {
+                        // TODO: send response, that the user could not be confirmed
+                        return
+                    }
+                    // TODO: send response, that the credentials are correct and the user can access his data
+
+                } catch (e: SerializationException) {
+                    println("Could not decode from Json because 'data' is not a json string")
+                } catch (e: IllegalArgumentException) {
+                    println("Could not decode from Json because 'data' is not a representation of CostItem")
+                }
             }
+
+            // the user wants to get an update of all cost items
             MessageType.COST_GET_ITEMS -> {
-                // TODO: extract session_id to just send the update to that user
-                costsBroadcastAllItems()
+                if (members.containsKey(sessionId)) {
+                    // send update to the requested person
+                    costsSendUpdate(member = members[sessionId]!!)
+                } else println("Could not send update to $sessionId, because user is not online")
             }
-            MessageType.COST_ADD_ITEM -> {
-                val decodedData: CostItem = Json.decodeFromJsonElement(data)
-                costsAddNewItem(decodedData)
-                costsBroadcastAllItems()
+
+            // the user want to add an cost item
+            MessageType.COST_ADD_ITEM -> {                  // incoming data is from type CostItem
+                try {
+                    val decodedData: CostItem =             // decode to CostItem data class
+                        Json.decodeFromJsonElement(data)
+
+                    db.insertItem(item = decodedData)  // save the item inside database
+                    costsBroadcastAllItems()                // broadcast update to all online users
+
+                } catch (e: SerializationException) {
+                    println("Could not decode from Json because 'data' is not a json string")
+                } catch (e: IllegalArgumentException) {
+                    println("Could not decode from Json because 'data' is not a representation of CostItem")
+                }
+
             }
 
             MessageType.ERROR -> {
-                // TODO
+                println("Could not map the received MessageType: $messageType")
+                return
             }
         }
     }
 
-
-    private suspend fun costsAddNewItem(item: CostItem) {
-        costDataSource.insertItem(item)
-    }
-
     suspend fun costsBroadcastAllItems() {
-        val items: List<CostItem> = costDataSource.getAllItems()
-        val resultWrapper = Json.encodeToString(
+        val resultWrapper: String = Json.encodeToString(
             CostResultWrapper(
-                items = items,
+                items = db.getAllItems(),
                 collectedTimestamp = System.currentTimeMillis()
             )
         )
 
-        members.values.forEach { member ->
+        members.values.forEach { member: Member ->
             member.socket.send(Frame.Text(resultWrapper))
         }
+    }
+
+    private suspend fun costsSendUpdate(member: Member) {
+        val resultWrapper: String = Json.encodeToString(
+            CostResultWrapper(
+                items = db.getAllItems(),
+                collectedTimestamp = System.currentTimeMillis()
+            )
+        )
+
+        member.socket.send(Frame.Text(resultWrapper))
     }
 
     suspend fun tryDisconnect(username: String) {

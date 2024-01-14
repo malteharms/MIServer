@@ -16,7 +16,7 @@ import kotlinx.serialization.json.JsonObject
 
 fun Route.appSocket(sessionController: SessionController) {
     webSocket("/app") {
-        val session = call.sessions.get<AppSession>()
+        val session: AppSession? = call.sessions.get<AppSession>()
         if (session == null) {
             close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "no session!"))
             return@webSocket
@@ -32,7 +32,10 @@ fun Route.appSocket(sessionController: SessionController) {
                 if(frame is Frame.Text) {
                     try {
                         val jsonRequest: JsonObject = Json.decodeFromString(frame.readText())
-                        sessionController.handleRequest(jsonRequest)
+                        sessionController.handleRequest(
+                            message = jsonRequest,
+                            sessionId = session.sessionId
+                        )
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
